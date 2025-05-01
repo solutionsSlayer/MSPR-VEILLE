@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: veille-postgres
+    environment:
+      POSTGRES_USER: veille_user
+      POSTGRES_PASSWORD: veille_password
+      POSTGRES_DB: veille_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init:/docker-entrypoint-initdb.d
+    restart: unless-stopped
+    networks:
+      - veille-network
+
+volumes:
+  postgres_data:
+
+networks:
+  veille-network:
+    driver: bridge

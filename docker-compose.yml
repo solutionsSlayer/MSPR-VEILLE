@@ -1,0 +1,100 @@
+version: '3.8'
+
+services:
+  # PostgreSQL database
+  postgres:
+    image: postgres:16
+    container_name: veille-postgres
+    environment:
+      POSTGRES_USER: veille_user
+      POSTGRES_PASSWORD: veille_password
+      POSTGRES_DB: veille_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/init:/docker-entrypoint-initdb.d
+    restart: unless-stopped
+    networks:
+      - veille-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U veille_user -d veille_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # NextJS application (can be enabled once you're ready to include it)
+  # app:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   container_name: veille-app
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     - DATABASE_URL=postgresql://veille_user:veille_password@postgres:5432/veille_db
+  #     - NODE_ENV=production
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #   restart: unless-stopped
+  #   networks:
+  #     - veille-network
+  
+  # RSS Fetcher Service (can be enabled once you've implemented it)
+  # rss-fetcher:
+  #   build:
+  #     context: ./src/services/rss-fetcher
+  #     dockerfile: Dockerfile
+  #   container_name: veille-rss-fetcher
+  #   environment:
+  #     - DATABASE_URL=postgresql://veille_user:veille_password@postgres:5432/veille_db
+  #     - FETCH_INTERVAL=3600  # in seconds
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #   restart: unless-stopped
+  #   networks:
+  #     - veille-network
+
+  # AI Summary Service (can be enabled once you've implemented it)
+  # ai-summary:
+  #   build:
+  #     context: ./src/services/ai-summary
+  #     dockerfile: Dockerfile
+  #   container_name: veille-ai-summary
+  #   environment:
+  #     - DATABASE_URL=postgresql://veille_user:veille_password@postgres:5432/veille_db
+  #     - OPENAI_API_KEY=${OPENAI_API_KEY}
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #   restart: unless-stopped
+  #   networks:
+  #     - veille-network
+
+  # Podcast Generator Service (can be enabled once you've implemented it)
+  # podcast-generator:
+  #   build:
+  #     context: ./src/services/podcast-generator
+  #     dockerfile: Dockerfile
+  #   container_name: veille-podcast-generator
+  #   environment:
+  #     - DATABASE_URL=postgresql://veille_user:veille_password@postgres:5432/veille_db
+  #     - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY}
+  #   volumes:
+  #     - podcast_data:/app/podcasts
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #   restart: unless-stopped
+  #   networks:
+  #     - veille-network
+
+volumes:
+  postgres_data:
+  # podcast_data:   # Uncomment when ready to use the podcast-generator service
+
+networks:
+  veille-network:
+    driver: bridge
