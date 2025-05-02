@@ -30,77 +30,67 @@ services:
       dockerfile: Dockerfile
     container_name: veille-app
     ports:
-      - "3000:3000"
+      - "3000:3000" # Changed port to 3000 for convention
     environment:
       - DATABASE_URL=postgresql://veille_user:veille_password@postgres:5432/veille_db
       - NODE_ENV=production
       - GOOGLE_GENAI_API_KEY=${GOOGLE_GENAI_API_KEY}
+      - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN} # Pass Telegram token if needed by backend
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}     # Pass Telegram chat ID if needed by backend
+       # Voice IDs (optional here if also set in code, but good practice)
+      - ELEVENLABS_EN_VOICE_ID=${ELEVENLABS_EN_VOICE_ID}
+      - ELEVENLABS_FR_VOICE_ID=${ELEVENLABS_FR_VOICE_ID}
     depends_on:
       postgres:
         condition: service_healthy
     restart: unless-stopped
     networks:
       - veille-network
-  
-  # RSS Fetcher Service
-  rss-fetcher:
-    build:
-      context: .
-      dockerfile: src/services/rss-fetcher/Dockerfile
-    container_name: veille-rss-fetcher
-    environment:
-      - DATABASE_URL=postgresql://veille_user:veille_password@postgres:5432/veille_db
-      - RSS_FETCH_CRON=0 * * * *  # Every hour
-    depends_on:
-      postgres:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - veille-network
+    volumes:
+       # Mount public/podcasts to allow Next.js to serve generated files
+      - podcast_data:/app/public/podcasts
 
-  # AI Summary Service
-  ai-summary:
+  # CRON Job Orchestrator Service
+  cron:
     build:
       context: .
-      dockerfile: src/services/ai-summary/Dockerfile
-    container_name: veille-ai-summary
+      dockerfile: Dockerfile # Use the same Dockerfile as the app, but override command
+    container_name: veille-cron
+    command: npm run cron:start # Command to start the cron orchestrator script
     environment:
       - DATABASE_URL=postgresql://veille_user:veille_password@postgres:5432/veille_db
       - GOOGLE_GENAI_API_KEY=${GOOGLE_GENAI_API_KEY}
-      - AI_SUMMARY_CRON=0 */3 * * *  # Every 3 hours
-      - AI_SUMMARY_BATCH_SIZE=10
-    depends_on:
-      postgres:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - veille-network
-
-  # Podcast Generator Service
-  podcast-generator:
-    build:
-      context: .
-      dockerfile: src/services/podcast-generator/Dockerfile
-    container_name: veille-podcast-generator
-    environment:
-      - DATABASE_URL=postgresql://veille_user:veille_password@postgres:5432/veille_db
       - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+      # CRON Schedules (can be overridden)
+      - RSS_FETCH_CRON=${RSS_FETCH_CRON:-0 * * * *}         # Default: Every hour
+      - AI_SUMMARY_CRON=${AI_SUMMARY_CRON:-0 */3 * * *}    # Default: Every 3 hours
+      - AI_SUMMARY_BATCH_SIZE=${AI_SUMMARY_BATCH_SIZE:-10}
+      - PODCAST_GEN_CRON=${PODCAST_GEN_CRON:-0 */6 * * *}   # Default: Every 6 hours
+      - PODCAST_GEN_BATCH_SIZE=${PODCAST_GEN_BATCH_SIZE:-5}
+      # Voice IDs
       - ELEVENLABS_EN_VOICE_ID=${ELEVENLABS_EN_VOICE_ID}
       - ELEVENLABS_FR_VOICE_ID=${ELEVENLABS_FR_VOICE_ID}
-      - PODCAST_GEN_CRON=0 */6 * * *  # Every 6 hours
-      - PODCAST_GEN_BATCH_SIZE=5
-    volumes:
-      - podcast_data:/app/public/podcasts
+      # Optional: Run jobs immediately on start
+      - RUN_JOBS_ON_STARTUP=${RUN_JOBS_ON_STARTUP:-false}
+      - PODCASTS_DIR=/app/public/podcasts # Ensure cron uses the same volume path
     depends_on:
       postgres:
         condition: service_healthy
+      app: # Make cron depend on app potentially, if app setup is needed first (optional)
+         condition: service_started
     restart: unless-stopped
     networks:
       - veille-network
+    volumes:
+       # Mount podcast data volume for the cron service to write files
+      - podcast_data:/app/public/podcasts
 
 volumes:
   postgres_data:
-  podcast_data:   # Storage for podcast audio files
+  podcast_data:   # Shared volume for podcast audio files
 
 networks:
   veille-network:
