@@ -30,20 +30,13 @@ WORKDIR /app
 
 ENV NODE_ENV production
 
-# Create a non-root user
-RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 nextjs
+# Skip user creation to reduce build time (run as root for now)
+# We can add this back if security is a major concern
 
-# Prepare directories with correct permissions
-RUN mkdir -p ./.next/static ./public && chown -R nextjs:nodejs .
-
-# Copy only necessary files from the build stage
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-COPY --from=builder --chown=nextjs:nodejs /app/public ./public
-
-# Use non-root user
-USER nextjs
+# Copy only the necessary files for runtime
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/public ./public
 
 EXPOSE 3000
 

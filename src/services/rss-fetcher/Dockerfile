@@ -8,8 +8,19 @@ COPY package.json package-lock.json* ./
 # Install dependencies
 RUN npm ci --only=production
 
+# Create non-root user early
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 appuser
+
+# Create directories with correct ownership from the start
+RUN mkdir -p /app/dist && \
+    chown appuser:nodejs /app /app/dist
+
+# Switch to non-root user for the rest of the build
+USER appuser
+
 # Copy source code
-COPY . .
+COPY --chown=appuser:nodejs . .
 
 # Build TypeScript code
 RUN npm run build
@@ -18,16 +29,6 @@ RUN npm run build
 ENV NODE_ENV=production
 ENV LOG_LEVEL=info
 ENV RSS_FETCH_CRON="0 * * * *"
-
-# Create a non-root user
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 appuser
-
-# Set ownership
-RUN chown -R appuser:nodejs /app
-
-# Switch to non-root user
-USER appuser
 
 # Command to run the service
 CMD ["node", "dist/services/rss-fetcher/index.js"]
