@@ -13,8 +13,13 @@ RUN npm ci
 # Rebuild the source code only when needed
 FROM base AS builder
 WORKDIR /app
+
+# Copy dependencies and source code
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+
+# Ensure public directory exists
+RUN mkdir -p ./public
 
 # Build the application
 RUN npm run build
@@ -26,14 +31,18 @@ WORKDIR /app
 ENV NODE_ENV production
 
 # Create a non-root user
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs
 
-# Set the correct permissions
-COPY --from=builder /app/public ./public
+# Prepare directories with correct permissions
+RUN mkdir -p ./.next/static ./public && chown -R nextjs:nodejs .
+
+# Copy only necessary files from the build stage
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
+# Use non-root user
 USER nextjs
 
 EXPOSE 3000
