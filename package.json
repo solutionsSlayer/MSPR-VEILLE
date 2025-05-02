@@ -10,9 +10,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "start:rss-fetcher": "ts-node src/services/rss-fetcher/index.ts",
-    "start:ai-summary": "ts-node src/services/ai-summary/index.ts",
-    "start:podcast-generator": "ts-node src/services/podcast-generator/index.ts"
+    "cron:start": "ts-node src/services/cron-jobs.ts"
   },
   "dependencies": {
     "@genkit-ai/googleai": "^1.6.2",
