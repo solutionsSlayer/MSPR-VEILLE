@@ -41,51 +41,20 @@ services:
        # Voice IDs (optional here if also set in code, but good practice)
       - ELEVENLABS_EN_VOICE_ID=${ELEVENLABS_EN_VOICE_ID}
       - ELEVENLABS_FR_VOICE_ID=${ELEVENLABS_FR_VOICE_ID}
-    depends_on:
-      postgres:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - veille-network
-    volumes:
-       # Mount public/podcasts to allow Next.js to serve generated files
-      - podcast_data:/app/public/podcasts
-
-  # CRON Job Orchestrator Service
-  cron:
-    build:
-      context: .
-      dockerfile: Dockerfile # Use the same Dockerfile as the app, but override command
-    container_name: veille-cron
-    command: npm run cron:start # Command to start the cron orchestrator script
-    environment:
-      - DATABASE_URL=postgresql://veille_user:veille_password@postgres:5432/veille_db
-      - GOOGLE_GENAI_API_KEY=${GOOGLE_GENAI_API_KEY}
-      - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY}
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
       # CRON Schedules (can be overridden)
       - RSS_FETCH_CRON=${RSS_FETCH_CRON:-0 * * * *}         # Default: Every hour
       - AI_SUMMARY_CRON=${AI_SUMMARY_CRON:-0 */3 * * *}    # Default: Every 3 hours
       - AI_SUMMARY_BATCH_SIZE=${AI_SUMMARY_BATCH_SIZE:-10}
       - PODCAST_GEN_CRON=${PODCAST_GEN_CRON:-0 */6 * * *}   # Default: Every 6 hours
       - PODCAST_GEN_BATCH_SIZE=${PODCAST_GEN_BATCH_SIZE:-5}
-      # Voice IDs
-      - ELEVENLABS_EN_VOICE_ID=${ELEVENLABS_EN_VOICE_ID}
-      - ELEVENLABS_FR_VOICE_ID=${ELEVENLABS_FR_VOICE_ID}
-      # Optional: Run jobs immediately on start
-      - RUN_JOBS_ON_STARTUP=${RUN_JOBS_ON_STARTUP:-false}
-      - PODCASTS_DIR=/app/public/podcasts # Ensure cron uses the same volume path
+      - PODCASTS_DIR=/app/public/podcasts # Ensure app uses the same volume path
     depends_on:
       postgres:
         condition: service_healthy
-      app: # Make cron depend on app potentially, if app setup is needed first (optional)
-         condition: service_started
     restart: unless-stopped
     networks:
       - veille-network
     volumes:
-       # Mount podcast data volume for the cron service to write files
       - podcast_data:/app/public/podcasts
 
 volumes:

@@ -4,78 +4,67 @@ FROM node:20-slim AS base
 # Set the working directory in the container
 WORKDIR /app
 
-# Install pnpm globally
-RUN npm install -g pnpm
+# --- Dependencies Stage ---
+FROM base AS deps
+WORKDIR /app
 
-# Copy package.json and pnpm-lock.yaml first to leverage Docker cache
-COPY package.json pnpm-lock.yaml* ./
+# Copy package.json and package-lock.json first to leverage Docker cache
+COPY package.json package-lock.json* ./
 
-# Install dependencies using pnpm
-RUN pnpm install --frozen-lockfile
+# Install dependencies using npm
+RUN npm ci
 
-# Copy the rest of the application code
+# --- Build Stage ---
+FROM base AS builder
+WORKDIR /app
+
+# Copy dependencies from deps stage
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-<<<<<<< HEAD
 # Ensure public directory exists
 RUN mkdir -p ./public
 
-# Build the application
+# Build the Next.js application
+ENV NODE_ENV production
 RUN npm run build
 
-# Production image, copy all the files and run next
-FROM base AS runner
+# --- Development Stage ---
+FROM base AS dev
+WORKDIR /app
+
+# Copy dependencies and source
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+# Set NODE_ENV to development
+ENV NODE_ENV development
+
+# Command to run the app in development mode
+CMD ["npm", "run", "dev"]
+
+# --- Production Stage ---
+FROM base AS production
 WORKDIR /app
 
 ENV NODE_ENV production
 
-# Skip user creation to reduce build time (run as root for now)
-# We can add this back if security is a major concern
-
 # Copy only the necessary files for runtime
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
-COPY --from=builder /app/public ./public
-
-=======
-# Expose the port the app runs on (default Next.js port)
->>>>>>> 3fd860af9d6f4df444da3275f0f6faa9d049920a
-EXPOSE 3000
-
-# --- Development Stage (Optional) ---
-FROM base AS dev
-# Set NODE_ENV to development
-ENV NODE_ENV development
-# Command to run the app in development mode (using Next.js dev server)
-CMD ["pnpm", "dev"]
-
-
-# --- Build Stage ---
-FROM base AS builder
-# Set NODE_ENV to production for build
-ENV NODE_ENV production
-# Build the Next.js application
-RUN pnpm build
-
-
-# --- Production Stage ---
-FROM base AS production
-# Set NODE_ENV to production
-ENV NODE_ENV production
-
-# Copy built assets from the builder stage
 COPY --from=builder /app/.next /app/.next
 COPY --from=builder /app/public /app/public
-# Copy node_modules (already installed in 'base' stage, pnpm handles linking)
-# Ensure necessary runtime dependencies are available
+COPY --from=builder /app/src /app/src
+# Ensure services directory is explicitly copied
+COPY --from=builder /app/src/services /app/src/services
+COPY --from=deps /app/node_modules ./node_modules
+COPY package.json ./
+
+# Expose the port the app runs on
+EXPOSE 3000
 
 # Command to run the app in production mode
-CMD ["pnpm", "start"]
+CMD ["npm", "run", "start"]
 
 # Note: The 'cron' service in docker-compose.yml uses this same image
-# but overrides the CMD to run 'pnpm run cron:start'.
+# but overrides the CMD to run 'npm run cron:start'.
 # Ensure 'ts-node' and 'node-cron' are listed as dependencies in package.json
 # so they are available in the final image for the cron service.
-# If cron:start directly executes a JS file after build, ts-node might not be needed
-# in the production stage itself, only for local dev or if the cron script isn't compiled.
-# The current setup uses ts-node, so it MUST be in dependencies (not devDependencies).

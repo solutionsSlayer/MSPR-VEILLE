@@ -14,6 +14,16 @@ import path from 'path';
 import { ai } from '../ai/ai-instance';
 import { logger } from '../lib/logger';
 
+// Extend the Item type from rss-parser with our additional properties
+interface ExtendedItem extends Parser.Item {
+  content?: string;
+  'content:encoded'?: string;
+  contentSnippet?: string;
+  description?: string;
+  author?: string;
+  creator?: string;
+}
+
 // --- Configuration ---
 const DATABASE_URL = process.env.DATABASE_URL;
 const RSS_FETCH_CRON = process.env.RSS_FETCH_CRON || '0 * * * *';         // Default: Every hour
@@ -64,7 +74,7 @@ async function fetchAndProcessFeed(feed: any) {
     await pool.query('UPDATE rss.feeds SET last_fetched = NOW() WHERE id = $1', [feedId]);
 
     let newItemCount = 0;
-    for (const item of feedContent.items || []) {
+    for (const item of feedContent.items as ExtendedItem[]) {
       try {
         const guid = item.guid || item.link;
         if (!guid) continue;
@@ -108,7 +118,12 @@ async function runRssFetcherJob() {
 }
 
 // --- AI Summary Logic ---
-async function generateAndSaveSummary(item: any) {
+async function generateAndSaveSummary(item: {
+  id: number;
+  title: string;
+  content?: string;
+  description?: string;
+}) {
   const { id: itemId, title, content, description } = item;
   log.info(`Generating summary for item ID: ${itemId}`);
   try {
@@ -159,19 +174,26 @@ async function runAiSummaryJob() {
 }
 
 // --- Podcast Generator Logic ---
-async function generateAndSavePodcast(summary: any) {
+async function generateAndSavePodcast(summary: {
+  id: number;
+  item_id: number;
+  summary_text: string;
+  language: string;
+  item_title?: string;
+  feed_title?: string;
+}) {
   const { id: summaryId, item_id: itemId, summary_text: summaryText, language, item_title, feed_title } = summary;
   log.info(`Generating podcast for summary ID: ${summaryId} (Item ID: ${itemId})`);
   try {
     await fs.promises.mkdir(PODCASTS_DIR, { recursive: true });
-    const feedDir = path.join(PODCASTS_DIR, sanitizeFilename(feed_title));
+    const feedDir = path.join(PODCASTS_DIR, sanitizeFilename(feed_title || 'default-feed'));
     await fs.promises.mkdir(feedDir, { recursive: true });
 
     const fileName = `${sanitizeFilename(item_title || `podcast-${summaryId}`)}.mp3`;
     const absoluteFilePath = path.join(feedDir, fileName);
-    const publicRelativePath = path.join('podcasts', sanitizeFilename(feed_title), fileName); // Relative to /public
+    const publicRelativePath = path.join('podcasts', sanitizeFilename(feed_title || 'default-feed'), fileName); // Relative to /public
 
-    const textToSpeak = `${item_title}. ${summaryText}`;
+    const textToSpeak = `${item_title || ''}. ${summaryText}`;
     const voiceId = VOICE_IDS[language] || VOICE_IDS.en;
 
     const response = await axios({
