@@ -1,0 +1,17 @@
+# Use Node.js image
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Copy package files and install dependencies
+COPY package*.json ./
+RUN npm ci
+
+# Copy source code
+COPY . .
+
+# Create podcasts directory
+RUN mkdir -p ./public/podcasts
+
+# Start the cron job wrapper script
+CMD ["node", "src/services/cron-wrapper.js"]

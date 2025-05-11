@@ -1,0 +1,105 @@
+#!/bin/bash
+
+# Create necessary directories
+mkdir -p nginx/conf
+mkdir -p nginx/ssl
+mkdir -p nginx/certbot/conf
+mkdir -p nginx/certbot/www
+
+# Create Nginx configuration file
+cat > nginx/conf/app.conf << 'EOF'
+server {
+    listen 80;
+    listen [::]:80;
+    server_name veille.yourdomain.com;  # Replace with your actual domain
+
+    # For certbot challenges
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    # Redirect all HTTP traffic to HTTPS
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name veille.yourdomain.com;  # Replace with your actual domain
+
+    # SSL Configuration
+    ssl_certificate /etc/letsencrypt/live/veille.yourdomain.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/veille.yourdomain.com/privkey.pem;
+    ssl_trusted_certificate /etc/letsencrypt/live/veille.yourdomain.com/chain.pem;
+
+    # SSL settings
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers on;
+    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
+    ssl_session_tickets off;
+
+    # HSTS
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
+    # Proxy Next.js app
+    location / {
+        proxy_pass http://app:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Serve podcasts directly from the file system
+    location /podcasts/ {
+        alias /var/www/podcasts/;
+        expires 7d;
+        add_header Cache-Control "public, max-age=604800";
+    }
+}
+EOF
+
+# Create initial Nginx config without SSL for first-time setup
+cat > nginx/conf/app-init.conf << 'EOF'
+server {
+    listen 80;
+    listen [::]:80;
+    server_name veille.yourdomain.com;  # Replace with your actual domain
+
+    # For certbot challenges
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    # For initial setup, proxy all requests to the app
+    location / {
+        proxy_pass http://app:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Serve podcasts directly from the file system
+    location /podcasts/ {
+        alias /var/www/podcasts/;
+        expires 7d;
+        add_header Cache-Control "public, max-age=604800";
+    }
+}
+EOF
+
+echo "Nginx configuration files created successfully."
+echo "Remember to adjust the domain name in the configuration files before deployment."

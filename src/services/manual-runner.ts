@@ -14,6 +14,7 @@ import path from 'path';
 import { logger } from '../lib/logger';
 import Parser from 'rss-parser';
 import dotenv from 'dotenv';
+import { sendMessageToTelegram, sendAudioToTelegram, formatSummaryMessage, formatPodcastCaption } from './telegram';
 
 // Chargement des variables d'environnement
 dotenv.config();
@@ -22,6 +23,7 @@ dotenv.config();
 const DATABASE_URL = process.env.DATABASE_URL;
 const AI_SUMMARY_BATCH_SIZE = parseInt(process.env.AI_SUMMARY_BATCH_SIZE || '10', 10);
 const PODCAST_GEN_BATCH_SIZE = parseInt(process.env.PODCAST_GEN_BATCH_SIZE || '5', 10);
+const TELEGRAM_BATCH_SIZE = parseInt(process.env.TELEGRAM_BATCH_SIZE || '5', 10);
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
 const PODCASTS_DIR = process.env.PODCASTS_DIR || path.join(process.cwd(), 'public', 'podcasts');
 const VOICE_IDS: Record<string, string> = {
@@ -274,6 +276,117 @@ async function generateAndSavePodcast(summary: {
   }
 }
 
+// Job d'envoi des résumés et podcasts sur Telegram
+async function runTelegramJob() {
+  log.info(`Démarrage du job d'envoi Telegram (Taille du lot: ${TELEGRAM_BATCH_SIZE})...`);
+  
+  try {
+    // 1. Récupérer les résumés récents qui n'ont pas été envoyés sur Telegram
+    const result = await pool.query(`
+      SELECT s.id as summary_id, s.summary_text, s.language, s.created_at,
+             i.id as item_id, i.title as item_title, i.link as item_link,
+             f.title as feed_title,
+             p.id as podcast_id, p.audio_file_path
+      FROM rss.summaries s
+      JOIN rss.items i ON s.item_id = i.id
+      JOIN rss.feeds f ON i.feed_id = f.id
+      LEFT JOIN rss.podcasts p ON s.id = p.summary_id
+      WHERE NOT EXISTS (
+        SELECT 1 FROM rss.telegram_sent t 
+        WHERE t.summary_id = s.id AND t.type = 'summary'
+      )
+      ORDER BY s.created_at DESC
+      LIMIT $1
+    `, [TELEGRAM_BATCH_SIZE]);
+    
+    const summariesToSend = result.rows;
+    log.info(`${summariesToSend.length} résumés à envoyer sur Telegram.`);
+    
+    // 2. Envoyer chaque résumé
+    for (const summary of summariesToSend) {
+      try {
+        // Formatter le message
+        const message = formatSummaryMessage(
+          summary.item_title,
+          summary.summary_text,
+          summary.item_link,
+          summary.feed_title
+        );
+        
+        // Envoyer le message
+        await sendMessageToTelegram(message);
+        
+        // Marquer comme envoyé dans la base de données
+        await pool.query(
+          `INSERT INTO rss.telegram_sent (summary_id, item_id, type) VALUES ($1, $2, $3)`,
+          [summary.summary_id, summary.item_id, 'summary']
+        );
+        
+        log.info(`Résumé envoyé sur Telegram pour l'article: ${summary.item_title}`); 
+        
+        // Attendre un peu entre chaque envoi pour éviter les limitations de l'API
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      } catch (error) {
+        log.error(`Erreur lors de l'envoi du résumé sur Telegram pour ${summary.item_title}:`, error);
+      }
+    }
+    
+    // 3. Récupérer les podcasts récents qui n'ont pas été envoyés sur Telegram
+    const podcastResult = await pool.query(`
+      SELECT p.id as podcast_id, p.audio_file_path, p.created_at,
+             i.id as item_id, i.title as item_title, i.link as item_link,
+             f.title as feed_title
+      FROM rss.podcasts p
+      JOIN rss.items i ON p.item_id = i.id
+      JOIN rss.feeds f ON i.feed_id = f.id
+      WHERE NOT EXISTS (
+        SELECT 1 FROM rss.telegram_sent t 
+        WHERE t.podcast_id = p.id AND t.type = 'podcast'
+      )
+      ORDER BY p.created_at DESC
+      LIMIT $1
+    `, [TELEGRAM_BATCH_SIZE]);
+    
+    const podcastsToSend = podcastResult.rows;
+    log.info(`${podcastsToSend.length} podcasts à envoyer sur Telegram.`);
+    
+    // 4. Envoyer chaque podcast
+    for (const podcast of podcastsToSend) {
+      try {
+        // Chemin du fichier audio
+        const audioPath = path.join(process.cwd(), 'public', podcast.audio_file_path.replace(/^\//, ''));
+        
+        // Formatter la légende
+        const caption = formatPodcastCaption(
+          podcast.item_title,
+          podcast.item_link,
+          podcast.feed_title
+        );
+        
+        // Envoyer le fichier audio
+        await sendAudioToTelegram(audioPath, caption);
+        
+        // Marquer comme envoyé dans la base de données
+        await pool.query(
+          `INSERT INTO rss.telegram_sent (podcast_id, item_id, type) VALUES ($1, $2, $3)`,
+          [podcast.podcast_id, podcast.item_id, 'podcast']
+        );
+        
+        log.info(`Podcast envoyé sur Telegram pour l'article: ${podcast.item_title}`);
+        
+        // Attendre un peu entre chaque envoi pour éviter les limitations de l'API
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Délai plus long pour les fichiers audio
+      } catch (error) {
+        log.error(`Erreur lors de l'envoi du podcast sur Telegram pour ${podcast.item_title}:`, error);
+      }
+    }
+  } catch (error) {
+    log.error('Erreur lors du job Telegram:', error);
+  }
+  
+  log.info('Job Telegram terminé.');
+}
+
 // Point d'entrée principal - gestion des arguments
 async function main() {
   const args = process.argv.slice(2);
@@ -281,7 +394,7 @@ async function main() {
   const job = jobArg ? jobArg.split('=')[1] : '';
 
   if (!job) {
-    console.log('Usage: ts-node manual-runner.ts --job=[rss-fetch|ai-summary|podcast]');
+    console.log('Usage: ts-node manual-runner.ts --job=[rss-fetch|ai-summary|podcast|telegram]');
     return;
   }
 
@@ -295,9 +408,12 @@ async function main() {
     case 'podcast':
       await runPodcastGeneratorJob();
       break;
+    case 'telegram':
+      await runTelegramJob();
+      break;
     default:
       console.log(`Job inconnu: ${job}`);
-      console.log('Jobs disponibles: rss-fetch, ai-summary, podcast');
+      console.log('Jobs disponibles: rss-fetch, ai-summary, podcast, telegram');
   }
 
   // Fermer la connexion pool après l'exécution

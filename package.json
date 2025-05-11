@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit",
     "cron:start": "node src/services/cron-wrapper.js",
     "cron:run-ai-summary": "cross-env NODE_OPTIONS=\"--loader ts-node/esm\" ts-node src/services/manual-runner.ts --job=ai-summary",
-    "cron:run-podcast": "cross-env NODE_OPTIONS=\"--loader ts-node/esm\" ts-node src/services/manual-runner.ts --job=podcast"
+    "cron:run-podcast": "cross-env NODE_OPTIONS=\"--loader ts-node/esm\" ts-node src/services/manual-runner.ts --job=podcast",
+    "cron:run-telegram": "node run-telegram-job.js"
   },
   "dependencies": {
     "@genkit-ai/googleai": "^1.6.2",
@@ -58,7 +59,7 @@
     "react-hook-form": "^7.54.2",
     "recharts": "^2.15.1",
     "rss-parser": "^3.13.0",
-    "tailwind-merge": "^3.0.1",
+    "tailwind-merge": "^3.2.0",
     "tailwindcss-animate": "^1.0.7",
     "ts-node": "^10.9.2",
     "zod": "^3.24.2"

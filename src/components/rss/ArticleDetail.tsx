@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
-  ArrowLeft, Globe, Calendar, User, RefreshCw, Headphones, Play, Pause, Volume2, FileText, Download, AlertTriangle, Loader2,
+  ArrowLeft, Globe, Calendar, User, RefreshCw, Headphones, Play, Pause, Volume2, FileText, Download, AlertTriangle, Loader2, Send,
 } from "lucide-react";
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
@@ -84,6 +84,7 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ articleId }) => {
   const [activeTab, setActiveTab] = useState('article');
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   const [isGeneratingPodcast, setIsGeneratingPodcast] = useState(false);
+  const [isSendingToTelegram, setIsSendingToTelegram] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const { toast } = useToast();
@@ -205,6 +206,40 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ articleId }) => {
     }
   };
 
+  const sendToTelegram = async () => {
+    if (!article || isSendingToTelegram) return;
+    setIsSendingToTelegram(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/articles/${articleId}/telegram`, { method: 'POST' });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to send to Telegram');
+      }
+
+      // Display appropriate message based on what was sent
+      let description = '';
+      if (data.sent.summary && data.sent.podcast) {
+        description = 'Summary and podcast sent to Telegram channel';
+      } else if (data.sent.summary) {
+        description = 'Summary sent to Telegram channel';
+      } else if (data.sent.podcast) {
+        description = 'Podcast sent to Telegram channel';
+      } else {
+        description = 'Content sent to Telegram channel';
+      }
+
+      toast({ title: "Sent to Telegram", description });
+    } catch (err: any) {
+      console.error('Error sending to Telegram:', err);
+      setError(`Telegram send failed: ${err.message}`);
+      toast({ variant: "destructive", title: "Telegram Send Failed", description: err.message });
+    } finally {
+      setIsSendingToTelegram(false);
+    }
+  };
+
   if (loading) {
     return (
        <div className="container mx-auto py-6 space-y-6">
@@ -273,7 +308,22 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ articleId }) => {
 
 
       <div className="mb-6">
-        <h1 className="text-2xl md:text-3xl font-bold break-words">{article.title}</h1>
+        <div className="flex justify-between items-start">
+          <h1 className="text-2xl md:text-3xl font-bold break-words">{article.title}</h1>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="ml-2 whitespace-nowrap" 
+            onClick={sendToTelegram} 
+            disabled={isSendingToTelegram || (!summary && !podcast)}
+          >
+            {isSendingToTelegram ? (
+              <><Loader2 className="h-4 w-4 mr-2 animate-spin"/> Sending...</>
+            ) : (
+              <><Send className="h-4 w-4 mr-2" /> Send to Telegram</>
+            )}
+          </Button>
+        </div>
         <div className="flex flex-wrap gap-x-4 gap-y-2 mt-2 text-sm text-muted-foreground">
           <Badge variant="outline">{article.feed_title}</Badge>
           <div className="flex items-center gap-1.5">
