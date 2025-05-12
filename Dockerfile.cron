@@ -16,71 +16,8 @@ COPY ./public ./public
 # Create podcasts directory with correct permissions
 RUN mkdir -p ./public/podcasts
 
-# Create a simple JavaScript cron runner 
-RUN echo 'const cron = require("node-cron");\n\
-const { exec } = require("child_process");\n\
-const { Pool } = require("pg");\n\
-const Parser = require("rss-parser");\n\
-require("dotenv").config();\n\
-\n\
-console.log("Starting cron service...");\n\
-\n\
-// Configuration\n\
-const DATABASE_URL = process.env.DATABASE_URL;\n\
-const RSS_FETCH_CRON = process.env.RSS_FETCH_CRON || "0 * * * *";\n\
-const AI_SUMMARY_CRON = process.env.AI_SUMMARY_CRON || "0 */3 * * *";\n\
-const PODCAST_GEN_CRON = process.env.PODCAST_GEN_CRON || "0 */6 * * *";\n\
-\n\
-// Simple logger\n\
-const log = (message) => console.log(`[${new Date().toISOString()}] ${message}`);\n\
-\n\
-// Task functions - run simple scripts directly\n\
-const runRssFetch = () => {\n\
-  log("Running RSS fetch job");\n\
-  exec("node src/services/rss-fetcher.js", (error, stdout, stderr) => {\n\
-    if (error) {\n\
-      console.error(`Error: ${error.message}`);\n\
-      return;\n\
-    }\n\
-    if (stderr) {\n\
-      console.error(`Stderr: ${stderr}`);\n\
-      return;\n\
-    }\n\
-    console.log(`Stdout: ${stdout}`);\n\
-  });\n\
-};\n\
-\n\
-// Schedule cron jobs\n\
-cron.schedule(RSS_FETCH_CRON, () => {\n\
-  log(`Running scheduled RSS fetch job: ${RSS_FETCH_CRON}`);\n\
-  runRssFetch();\n\
-});\n\
-\n\
-cron.schedule(AI_SUMMARY_CRON, () => {\n\
-  log(`Running scheduled AI summary job: ${AI_SUMMARY_CRON}`);\n\
-  exec("node src/services/ai-summary.js", (error, stdout, stderr) => {\n\
-    console.log(stdout);\n\
-    if (error) console.error(error);\n\
-  });\n\
-});\n\
-\n\
-cron.schedule(PODCAST_GEN_CRON, () => {\n\
-  log(`Running scheduled podcast generation job: ${PODCAST_GEN_CRON}`);\n\
-  exec("node src/services/podcast-generator.js", (error, stdout, stderr) => {\n\
-    console.log(stdout);\n\
-    if (error) console.error(error);\n\
-  });\n\
-});\n\
-\n\
-// Initial run at startup\n\
-setTimeout(() => {\n\
-  log("Running initial RSS fetch job");\n\
-  runRssFetch();\n\
-}, 10000); // Wait 10 seconds for other services to be ready\n\
-\n\
-// Keep service running\n\
-log("Cron service started and running...");\n\
-' > /app/cron-service.js
+# Copy cron service script instead of using echo
+COPY ./cron-service.js /app/cron-service.js
 
 # Start the cron service
 CMD ["node", "cron-service.js"]
