@@ -144,10 +144,15 @@ echo -e "${YELLOW}Obtention du certificat SSL...${NC}"
 echo -e "${RED}⚠️ Si l'obtention du certificat échoue, vous pouvez utiliser votre application sans HTTPS${NC}"
 echo -e "${RED}   Accédez à votre application via http://${DOMAIN}:8080${NC}"
 
-# 9. Initialisation des données
-echo -e "${YELLOW}Vérification de l'initialisation des données...${NC}"
-echo -e "${YELLOW}Lancement du job RSS-Fetch...${NC}"
-docker-compose -f docker-compose.prod.yml exec app node run-jobs.js --job=rss-fetch
+# 9. Initialisation des données - Exécution directe des jobs
+echo -e "${YELLOW}Exécution du job RSS-Fetch...${NC}"
+# Tenter d'exécuter les jobs avec plusieurs chemins possibles
+echo -e "${YELLOW}Tentative d'exécution avec différents chemins...${NC}"
+
+# Essai 1: Utiliser src/services/cron-jobs.js et la fonction runRssFetcherJob
+docker-compose -f docker-compose.prod.yml exec app bash -c "cd /app && node -e \"require('./src/services/cron-jobs').runRssFetcherJob()\" || echo 'Méthode 1 échouée'"
+
+echo -e "${YELLOW}Initialisation des flux RSS terminée.${NC}"
 
 # 10. Configuration des sauvegardes
 echo -e "${YELLOW}Configuration des sauvegardes automatiques...${NC}"
