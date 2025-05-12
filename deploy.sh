@@ -95,71 +95,11 @@ server {
 }
 EOL
 
-# 3. Créer le fichier de configuration Nginx avec SSL
-echo -e "${YELLOW}Création de la configuration Nginx avec SSL...${NC}"
-cat > nginx/conf/app-ssl.conf << EOL
-server {
-    listen 80;
-    listen [::]:80;
-    server_name ${DOMAIN};
+# 3. (SKIPPED) Créer le fichier de configuration Nginx avec SSL
+echo -e "${YELLOW}Utilisation de la configuration Nginx existante...${NC}"
 
-    # For certbot challenges
-    location /.well-known/acme-challenge/ {
-        root /var/www/certbot;
-    }
-
-    # Redirect all HTTP traffic to HTTPS
-    location / {
-        return 301 https://\$host\$request_uri;
-    }
-}
-
-server {
-    listen 443 ssl http2;
-    listen [::]:443 ssl http2;
-    server_name ${DOMAIN};
-
-    # SSL Configuration
-    ssl_certificate /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
-    ssl_trusted_certificate /etc/letsencrypt/live/${DOMAIN}/chain.pem;
-
-    # SSL settings
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_prefer_server_ciphers on;
-    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305;
-    ssl_session_cache shared:SSL:10m;
-    ssl_session_timeout 10m;
-    ssl_session_tickets off;
-
-    # HSTS
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-
-    # Proxy Next.js app
-    location / {
-        proxy_pass http://app:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host \$host;
-        proxy_cache_bypass \$http_upgrade;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-    }
-
-    # Serve podcasts directly from the file system
-    location /podcasts/ {
-        alias /var/www/podcasts/;
-        expires 7d;
-        add_header Cache-Control "public, max-age=604800";
-    }
-}
-EOL
-
-# 4. Copier la configuration initiale
-echo -e "${YELLOW}Utilisation de la configuration Nginx initiale...${NC}"
-cp nginx/conf/app-init.conf nginx/conf/app.conf
+# 4. (SKIPPED) Copier la configuration initiale
+echo -e "${YELLOW}Configuration Nginx déjà en place...${NC}"
 
 # 5. Création du fichier .env
 if [ ! -f .env ]; then
