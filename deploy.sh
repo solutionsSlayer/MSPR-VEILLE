@@ -171,21 +171,20 @@ fi
 # 6. Correction des fichiers pour éviter les erreurs de compilation
 echo -e "${YELLOW}Correction des fichiers pour éviter les erreurs de compilation...${NC}"
 
-# Mise à jour de next.config.js - Déplacer outputFileTracingRoot hors de experimental
+# Mise à jour de next.config.js - en utilisant une syntaxe simple et correcte
+rm -f next.config.js next.config.ts
 cat > next.config.js << EOL
-/** @type {import('next').NextConfig} */
-const nextConfig = {
-  output: 'standalone',
-  outputFileTracingRoot: __dirname,
-  typescript: {
-    // !! WARN !!
-    // Ignoring type checking during build for production
-    ignoreBuildErrors: true,
-  },
-}
-
-module.exports = nextConfig
+module.exports = { 
+  output: "standalone", 
+  outputFileTracingRoot: __dirname, 
+  typescript: { 
+    ignoreBuildErrors: true 
+  } 
+};
 EOL
+
+# Vérifier la syntaxe du fichier
+cat next.config.js
 
 # Correction de la route bookmark pour utiliser NextRequest
 if [ -f src/app/api/articles/[id]/bookmark/route.ts ]; then

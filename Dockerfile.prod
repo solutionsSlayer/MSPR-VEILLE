@@ -16,8 +16,10 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Ensure next.config.js has the correct configuration
-RUN echo '/** @type {import("next").NextConfig} */\nconst nextConfig = {\n  output: "standalone",\n  outputFileTracingRoot: __dirname,\n  typescript: {\n    // !! WARN !!\n    // Ignoring type checking during build for production\n    ignoreBuildErrors: true,\n  },\n}\n\nmodule.exports = nextConfig' > ./next.config.js
+# Create a proper next.config.js with correct syntax
+RUN rm -f next.config.js next.config.ts
+RUN echo 'module.exports = { output: "standalone", outputFileTracingRoot: __dirname, typescript: { ignoreBuildErrors: true } };' > next.config.js
+RUN cat next.config.js
 
 # Build the application
 RUN npm run build
