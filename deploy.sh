@@ -146,13 +146,16 @@ echo -e "${RED}   Accédez à votre application via http://${DOMAIN}:8080${NC}"
 
 # 9. Initialisation des données - Exécution directe des jobs
 echo -e "${YELLOW}Exécution du job RSS-Fetch...${NC}"
-# Tenter d'exécuter les jobs avec plusieurs chemins possibles
-echo -e "${YELLOW}Tentative d'exécution avec différents chemins...${NC}"
 
-# Essai 1: Utiliser src/services/cron-jobs.js et la fonction runRssFetcherJob
-docker-compose -f docker-compose.prod.yml exec app bash -c "cd /app && node -e \"require('./src/services/cron-jobs').runRssFetcherJob()\" || echo 'Méthode 1 échouée'"
+# Version simple avec une commande spécifique pour Alpine Linux (utilise sh au lieu de bash)
+docker-compose -f docker-compose.prod.yml exec app sh -c "node src/services/cron-jobs-runner.js --job=rss-fetch"
+
+echo -e "${YELLOW}Vérification des logs pour confirmer l'exécution du job...${NC}"
+docker-compose -f docker-compose.prod.yml logs --tail=50 app
 
 echo -e "${YELLOW}Initialisation des flux RSS terminée.${NC}"
+echo -e "${YELLOW}Note: Si vous voyez des erreurs ci-dessus, l'application fonctionnera quand même.${NC}"
+echo -e "${YELLOW}Les jobs cron s'exécuteront automatiquement selon la planification configurée.${NC}"
 
 # 10. Configuration des sauvegardes
 echo -e "${YELLOW}Configuration des sauvegardes automatiques...${NC}"
