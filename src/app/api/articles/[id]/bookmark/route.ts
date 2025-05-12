@@ -1,12 +1,13 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { Pool } from 'pg';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
 
+// Correction du type pour être compatible avec Next.js App Router
 export async function POST(
-  request: Request,
+  request: NextRequest, 
   { params }: { params: { id: string } }
 ) {
   const articleId = parseInt(params.id, 10);
