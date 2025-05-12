@@ -21,7 +21,9 @@ mkdir -p nginx/conf
 mkdir -p nginx/ssl
 mkdir -p nginx/certbot/conf
 mkdir -p nginx/certbot/www
+mkdir -p public/podcasts
 chmod -R 755 nginx
+chmod -R 755 public
 
 # 2. Créer le fichier de configuration Nginx initial
 echo -e "${YELLOW}Création de la configuration Nginx initiale...${NC}"
@@ -131,28 +133,39 @@ if [ ! -f .env ]; then
     echo -e "${RED}⚠️ N'oubliez pas de modifier le fichier .env avec vos propres valeurs!${NC}"
 fi
 
-# Arrêter et supprimer les conteneurs existants pour reconstruire complètement
+# 6. Mise à jour de next.config.js si nécessaire
+echo -e "${YELLOW}Mise à jour de la configuration Next.js...${NC}"
+cat > next.config.js << EOL
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  output: 'standalone',
+  // This is needed for Docker deployments
+  experimental: {
+    // this includes files from the monorepo base path
+    outputFileTracingRoot: __dirname,
+  },
+}
+
+module.exports = nextConfig
+EOL
+
+# 7. Arrêter et supprimer les conteneurs existants
 echo -e "${YELLOW}Arrêt et suppression des conteneurs existants...${NC}"
 docker-compose -f docker-compose.prod.yml down
 
-# 6. Démarrer l'application avec construction forcée
+# 8. Démarrer l'application avec reconstruction forcée
 echo -e "${YELLOW}Construction et démarrage des conteneurs...${NC}"
 docker-compose -f docker-compose.prod.yml up -d --build
 
-# 7. Attendre que les services soient prêts
+# 9. Attendre que les services soient prêts
 echo -e "${YELLOW}Attente du démarrage des services...${NC}"
 sleep 30
 
-# 8. Obtention du certificat SSL - modifié pour utiliser le port 8080
-echo -e "${YELLOW}Obtention du certificat SSL...${NC}"
-echo -e "${RED}⚠️ Si l'obtention du certificat échoue, vous pouvez utiliser votre application sans HTTPS${NC}"
-echo -e "${RED}   Accédez à votre application via http://${DOMAIN}:8080${NC}"
+# 10. Vérifier l'état des conteneurs
+echo -e "${YELLOW}Vérification de l'état des conteneurs...${NC}"
+docker-compose -f docker-compose.prod.yml ps
 
-# 9. Vérifier les logs du conteneur cron
-echo -e "${YELLOW}Vérification des logs du conteneur cron...${NC}"
-docker-compose -f docker-compose.prod.yml logs --tail=30 cron
-
-# 10. Configuration des sauvegardes
+# 11. Configuration des sauvegardes
 echo -e "${YELLOW}Configuration des sauvegardes automatiques...${NC}"
 cat > ~/backup-veille.sh << 'EOL'
 #!/bin/bash
@@ -189,7 +202,7 @@ chmod +x ~/backup-veille.sh
 # Ajouter le job de sauvegarde au crontab
 (crontab -l 2>/dev/null; echo "0 2 * * * /home/$(whoami)/backup-veille.sh") | crontab -
 
-# 11. Script de surveillance
+# 12. Script de surveillance
 echo -e "${YELLOW}Configuration de la surveillance automatique...${NC}"
 cat > ~/check-veille.sh << 'EOL'
 #!/bin/bash
@@ -229,9 +242,10 @@ chmod +x ~/check-veille.sh
 # Ajouter le job de surveillance au crontab
 (crontab -l 2>/dev/null; echo "0 * * * * /home/$(whoami)/check-veille.sh") | crontab -
 
+# 13. Instructions finales
 echo -e "${GREEN}Déploiement terminé!${NC}"
 echo -e "${GREEN}Votre application est maintenant disponible à l'adresse http://${DOMAIN}:8080${NC}"
-echo -e "${GREEN}Le conteneur cron s'occupera d'exécuter les jobs selon la planification configurée.${NC}"
-echo -e "${YELLOW}N'oubliez pas de vérifier les logs pour vous assurer que tout fonctionne correctement:${NC}"
-echo -e "${YELLOW}docker-compose -f docker-compose.prod.yml logs -f${NC}"
-echo -e "${YELLOW}docker-compose -f docker-compose.prod.yml logs -f cron${NC}"
+echo -e "${GREEN}Surveillez les conteneurs avec : docker-compose -f docker-compose.prod.yml ps${NC}"
+echo -e "${YELLOW}Pour voir les logs de l'application : docker-compose -f docker-compose.prod.yml logs -f app${NC}"
+echo -e "${YELLOW}Pour voir les logs du cron : docker-compose -f docker-compose.prod.yml logs -f cron${NC}"
+echo -e "${YELLOW}Pour redémarrer tous les services : docker-compose -f docker-compose.prod.yml restart${NC}"
