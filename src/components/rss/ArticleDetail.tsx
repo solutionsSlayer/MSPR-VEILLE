@@ -265,7 +265,7 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ articleId }) => {
     );
   }
 
-  if (error && !article) { // Show main error only if article failed to load
+  if (error && !article) {
      return (
           <div className="container mx-auto py-6">
                <Button variant="ghost" size="sm" onClick={() => window.history.back()} className="mb-4">
