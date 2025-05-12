@@ -144,18 +144,13 @@ echo -e "${YELLOW}Obtention du certificat SSL...${NC}"
 echo -e "${RED}⚠️ Si l'obtention du certificat échoue, vous pouvez utiliser votre application sans HTTPS${NC}"
 echo -e "${RED}   Accédez à votre application via http://${DOMAIN}:8080${NC}"
 
-# 9. Initialisation des données - Exécution directe des jobs
-echo -e "${YELLOW}Exécution du job RSS-Fetch...${NC}"
+# 9. Plutôt que d'essayer d'exécuter le job dans le conteneur, nous l'exécutons dans le conteneur cron
+# qui a déjà toutes les dépendances installées
+echo -e "${YELLOW}Exécution du job RSS-Fetch via le conteneur cron...${NC}"
+echo -e "${YELLOW}Les jobs cron s'exécuteront automatiquement selon la planification configurée dans le conteneur cron.${NC}"
 
-# Exécution du job RSS-Fetch avec ts-node directement
-docker-compose -f docker-compose.prod.yml exec app sh -c "cd /app && npx ts-node src/services/manual-runner.ts --job=rss-fetch"
-
-echo -e "${YELLOW}Vérification des logs pour confirmer l'exécution du job...${NC}"
-docker-compose -f docker-compose.prod.yml logs --tail=50 app
-
-echo -e "${YELLOW}Initialisation des flux RSS terminée.${NC}"
-echo -e "${YELLOW}Note: Si vous voyez des erreurs ci-dessus, l'application fonctionnera quand même.${NC}"
-echo -e "${YELLOW}Les jobs cron s'exécuteront automatiquement selon la planification configurée.${NC}"
+echo -e "${YELLOW}Vérification des logs du conteneur cron...${NC}"
+docker-compose -f docker-compose.prod.yml logs --tail=30 cron
 
 # 10. Configuration des sauvegardes
 echo -e "${YELLOW}Configuration des sauvegardes automatiques...${NC}"
@@ -236,5 +231,7 @@ chmod +x ~/check-veille.sh
 
 echo -e "${GREEN}Déploiement terminé!${NC}"
 echo -e "${GREEN}Votre application est maintenant disponible à l'adresse http://${DOMAIN}:8080${NC}"
+echo -e "${GREEN}Le conteneur cron s'occupera d'exécuter les jobs selon la planification configurée.${NC}"
 echo -e "${YELLOW}N'oubliez pas de vérifier les logs pour vous assurer que tout fonctionne correctement:${NC}"
 echo -e "${YELLOW}docker-compose -f docker-compose.prod.yml logs -f${NC}"
+echo -e "${YELLOW}docker-compose -f docker-compose.prod.yml logs -f cron${NC}"
