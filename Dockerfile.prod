@@ -22,18 +22,23 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --only=production
 
+# Install required tools for running jobs
+RUN npm install -g ts-node
+
 # Copy built application from builder stage
 COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/.next/standalone ./standalone
 COPY --from=builder /app/next.config.ts ./
-COPY --from=builder /app/src/services ./src/services
+COPY --from=builder /app/src ./src
+COPY --from=builder /app/public ./public
 COPY --from=builder /app/telegram-sender.js ./
 COPY --from=builder /app/telegram-cron.js ./
 
-# Create podcasts directory
+# Create podcasts directory if it doesn't exist
 RUN mkdir -p ./public/podcasts
 
 # Expose port
 EXPOSE 3000
 
-# Start command
-CMD ["npm", "start"]
+# Start command - Use the standalone server as indicated by the warning
+CMD ["node", ".next/standalone/server.js"]

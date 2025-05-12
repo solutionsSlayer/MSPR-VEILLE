@@ -147,8 +147,8 @@ echo -e "${RED}   Accédez à votre application via http://${DOMAIN}:8080${NC}"
 # 9. Initialisation des données - Exécution directe des jobs
 echo -e "${YELLOW}Exécution du job RSS-Fetch...${NC}"
 
-# Version simple avec une commande spécifique pour Alpine Linux (utilise sh au lieu de bash)
-docker-compose -f docker-compose.prod.yml exec app sh -c "node src/services/cron-jobs-runner.js --job=rss-fetch"
+# Exécution du job RSS-Fetch avec ts-node directement
+docker-compose -f docker-compose.prod.yml exec app sh -c "cd /app && npx ts-node src/services/manual-runner.ts --job=rss-fetch"
 
 echo -e "${YELLOW}Vérification des logs pour confirmer l'exécution du job...${NC}"
 docker-compose -f docker-compose.prod.yml logs --tail=50 app
