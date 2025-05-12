@@ -131,9 +131,13 @@ if [ ! -f .env ]; then
     echo -e "${RED}⚠️ N'oubliez pas de modifier le fichier .env avec vos propres valeurs!${NC}"
 fi
 
-# 6. Démarrer l'application
-echo -e "${YELLOW}Démarrage de l'application...${NC}"
-docker-compose -f docker-compose.prod.yml up -d
+# Arrêter et supprimer les conteneurs existants pour reconstruire complètement
+echo -e "${YELLOW}Arrêt et suppression des conteneurs existants...${NC}"
+docker-compose -f docker-compose.prod.yml down
+
+# 6. Démarrer l'application avec construction forcée
+echo -e "${YELLOW}Construction et démarrage des conteneurs...${NC}"
+docker-compose -f docker-compose.prod.yml up -d --build
 
 # 7. Attendre que les services soient prêts
 echo -e "${YELLOW}Attente du démarrage des services...${NC}"
@@ -144,11 +148,7 @@ echo -e "${YELLOW}Obtention du certificat SSL...${NC}"
 echo -e "${RED}⚠️ Si l'obtention du certificat échoue, vous pouvez utiliser votre application sans HTTPS${NC}"
 echo -e "${RED}   Accédez à votre application via http://${DOMAIN}:8080${NC}"
 
-# 9. Plutôt que d'essayer d'exécuter le job dans le conteneur, nous l'exécutons dans le conteneur cron
-# qui a déjà toutes les dépendances installées
-echo -e "${YELLOW}Exécution du job RSS-Fetch via le conteneur cron...${NC}"
-echo -e "${YELLOW}Les jobs cron s'exécuteront automatiquement selon la planification configurée dans le conteneur cron.${NC}"
-
+# 9. Vérifier les logs du conteneur cron
 echo -e "${YELLOW}Vérification des logs du conteneur cron...${NC}"
 docker-compose -f docker-compose.prod.yml logs --tail=30 cron
 

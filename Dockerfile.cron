@@ -3,18 +3,21 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Copy package files and install dependencies
-COPY package*.json ./
-RUN npm ci --only=production
+# Copy minimal files needed for cron operation
+COPY package.json ./
+COPY cron-runner.js ./
+COPY src/services/cron-wrapper.js ./src/services/
 
-# Install additional dependencies needed for cron jobs
-RUN npm install node-cron axios pg rss-parser dotenv
+# Install minimal dependencies needed
+RUN npm install --no-package-lock --no-save \
+    node-cron \
+    axios \
+    pg \
+    rss-parser \
+    dotenv
 
-# Create podcasts directory
+# Create necessary directories
 RUN mkdir -p ./public/podcasts
 
-# Copy only the JavaScript cron runner
-COPY cron-runner.js ./
-
-# Start the cron job runner
+# Start with direct execution of our JavaScript cron runner
 CMD ["node", "cron-runner.js"]

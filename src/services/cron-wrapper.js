@@ -1,23 +1,16 @@
-// Simple wrapper to run cron-jobs.ts 
-// This avoids path resolution issues in Docker
+// Simple wrapper to run the JavaScript cron script
+// This avoids TypeScript compilation issues
 
 console.log('Starting cron wrapper...');
+console.log('Redirecting to JavaScript cron runner...');
 
-// Require the ts-node/register hook with transpileOnly option to skip type checking
-require('ts-node').register({
-  transpileOnly: true, // Skip type checking
-  compilerOptions: {
-    module: 'commonjs'
-  }
-});
-
-// Now we can require TypeScript files directly
+// Just require the JavaScript cron runner
 try {
-  console.log('Loading cron-jobs.ts...');
+  console.log('Loading cron-runner.js...');
   // Use an absolute path to the file
-  require('./cron-jobs.ts');
+  require('../../cron-runner.js');
   console.log('Cron jobs started successfully');
 } catch (error) {
-  console.error('Failed to load cron-jobs.ts:', error);
+  console.error('Failed to load cron-runner.js:', error);
   process.exit(1);
-} 
+}
