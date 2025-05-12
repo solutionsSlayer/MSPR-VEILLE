@@ -17,38 +17,7 @@ echo -e "${GREEN}Début du déploiement de l'application MSPR-VEILLE pour ${DOMA
 
 # 0. Nettoyage Docker pour libérer de l'espace
 echo -e "${YELLOW}Nettoyage de Docker pour libérer de l'espace disque...${NC}"
-echo -e "${YELLOW}Utilisation actuelle de l'espace disque:${NC}"
-df -h /
-
-# Nettoyer les ressources Docker non utilisées
-echo -e "${YELLOW}Suppression des conteneurs arrêtés, réseaux non utilisés et images en suspens...${NC}"
 docker system prune -f
-
-# Si les problèmes d'espace disque persistent, exécuter un nettoyage plus agressif
-if [ "$(df -h / | awk 'NR==2 {print $5}' | cut -d'%' -f1)" -gt 85 ]; then
-  echo -e "${RED}L'espace disque est supérieur à 85%, nettoyage plus agressif...${NC}"
-  
-  # Arrêter tous les conteneurs
-  docker stop $(docker ps -aq) 2>/dev/null || true
-  
-  # Supprimer tous les conteneurs
-  docker rm $(docker ps -aq) 2>/dev/null || true
-  
-  # Supprimer toutes les images
-  docker rmi $(docker images -q) -f 2>/dev/null || true
-  
-  # Supprimer les volumes non utilisés
-  docker volume prune -f
-  
-  # Supprimer les réseaux non utilisés
-  docker network prune -f
-  
-  # Nettoyer le système Docker complètement
-  docker system prune -a -f --volumes
-fi
-
-echo -e "${YELLOW}Utilisation de l'espace disque après nettoyage:${NC}"
-df -h /
 
 # 1. Créer les répertoires nécessaires
 echo -e "${YELLOW}Création des répertoires nécessaires...${NC}"
@@ -60,9 +29,9 @@ mkdir -p public/podcasts
 chmod -R 755 nginx
 chmod -R 755 public
 
-# 2. Créer le fichier de configuration Nginx initial
-echo -e "${YELLOW}Création de la configuration Nginx initiale...${NC}"
-cat > nginx/conf/app-init.conf << EOL
+# 2. Créer le fichier de configuration Nginx HTTP-only
+echo -e "${YELLOW}Création de la configuration Nginx (HTTP uniquement)...${NC}"
+cat > nginx/conf/app.conf << EOL
 server {
     listen 80;
     listen [::]:80;
@@ -95,20 +64,14 @@ server {
 }
 EOL
 
-# 3. (SKIPPED) Créer le fichier de configuration Nginx avec SSL
-echo -e "${YELLOW}Utilisation de la configuration Nginx existante...${NC}"
-
-# 4. (SKIPPED) Copier la configuration initiale
-echo -e "${YELLOW}Configuration Nginx déjà en place...${NC}"
-
-# 5. Création du fichier .env
+# 3. Création du fichier .env
 if [ ! -f .env ]; then
     echo -e "${YELLOW}Création du fichier .env depuis .env.prod.example...${NC}"
     cp .env.prod.example .env
     echo -e "${RED}⚠️ N'oubliez pas de modifier le fichier .env avec vos propres valeurs!${NC}"
 fi
 
-# 6. Correction des fichiers pour éviter les erreurs de compilation
+# 4. Correction des fichiers pour éviter les erreurs de compilation
 echo -e "${YELLOW}Correction des fichiers pour éviter les erreurs de compilation...${NC}"
 
 # Mise à jour de next.config.js - en utilisant une syntaxe simple et correcte
@@ -123,33 +86,23 @@ module.exports = {
 };
 EOL
 
-# Vérifier la syntaxe du fichier
-cat next.config.js
-
-# Correction de la route bookmark pour utiliser NextRequest
-if [ -f src/app/api/articles/[id]/bookmark/route.ts ]; then
-  echo -e "${YELLOW}Correction de la route API bookmark...${NC}"
-  sed -i 's/import { NextResponse } from .next\/server.;/import { NextRequest, NextResponse } from "next\/server";/g' src/app/api/articles/\[id\]/bookmark/route.ts
-  sed -i 's/request: Request,/request: NextRequest,/g' src/app/api/articles/\[id\]/bookmark/route.ts
-fi
-
-# 7. Arrêter et supprimer les conteneurs existants
+# 5. Arrêter et supprimer les conteneurs existants
 echo -e "${YELLOW}Arrêt et suppression des conteneurs existants...${NC}"
-docker-compose -f docker-compose.prod.yml down
+docker-compose -f docker-compose.prod.yml down --volumes
 
-# 8. Démarrer l'application avec reconstruction forcée
+# 6. Démarrer l'application avec reconstruction forcée
 echo -e "${YELLOW}Construction et démarrage des conteneurs...${NC}"
 docker-compose -f docker-compose.prod.yml up -d --build
 
-# 9. Attendre que les services soient prêts
+# 7. Attendre que les services soient prêts
 echo -e "${YELLOW}Attente du démarrage des services...${NC}"
 sleep 30
 
-# 10. Vérifier l'état des conteneurs
+# 8. Vérifier l'état des conteneurs
 echo -e "${YELLOW}Vérification de l'état des conteneurs...${NC}"
 docker-compose -f docker-compose.prod.yml ps
 
-# 11. Configuration des sauvegardes
+# 9. Configuration des sauvegardes
 echo -e "${YELLOW}Configuration des sauvegardes automatiques...${NC}"
 cat > ~/backup-veille.sh << 'EOL'
 #!/bin/bash
@@ -186,7 +139,7 @@ chmod +x ~/backup-veille.sh
 # Ajouter le job de sauvegarde au crontab
 (crontab -l 2>/dev/null; echo "0 2 * * * /home/$(whoami)/backup-veille.sh") | crontab -
 
-# 12. Script de surveillance
+# 10. Script de surveillance
 echo -e "${YELLOW}Configuration de la surveillance automatique...${NC}"
 cat > ~/check-veille.sh << 'EOL'
 #!/bin/bash
@@ -226,10 +179,12 @@ chmod +x ~/check-veille.sh
 # Ajouter le job de surveillance au crontab
 (crontab -l 2>/dev/null; echo "0 * * * * /home/$(whoami)/check-veille.sh") | crontab -
 
-# 13. Instructions finales
+# 11. Instructions finales
 echo -e "${GREEN}Déploiement terminé!${NC}"
-echo -e "${GREEN}Votre application est maintenant disponible à l'adresse http://${DOMAIN}:8080${NC}"
+echo -e "${GREEN}Votre application est maintenant disponible à l'adresse http://${DOMAIN}${NC}"
 echo -e "${GREEN}Surveillez les conteneurs avec : docker-compose -f docker-compose.prod.yml ps${NC}"
 echo -e "${YELLOW}Pour voir les logs de l'application : docker-compose -f docker-compose.prod.yml logs -f app${NC}"
 echo -e "${YELLOW}Pour voir les logs du cron : docker-compose -f docker-compose.prod.yml logs -f cron${NC}"
 echo -e "${YELLOW}Pour redémarrer tous les services : docker-compose -f docker-compose.prod.yml restart${NC}"
+echo -e "${YELLOW}Pour configurer HTTPS, exécutez get-ssl-cert.sh une fois que votre domaine est correctement configuré${NC}"
+EOL
