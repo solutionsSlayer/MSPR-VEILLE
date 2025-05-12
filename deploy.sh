@@ -21,6 +21,7 @@ mkdir -p nginx/conf
 mkdir -p nginx/ssl
 mkdir -p nginx/certbot/conf
 mkdir -p nginx/certbot/www
+chmod -R 755 nginx
 
 # 2. Créer le fichier de configuration Nginx initial
 echo -e "${YELLOW}Création de la configuration Nginx initiale...${NC}"
@@ -138,35 +139,17 @@ docker-compose -f docker-compose.prod.yml up -d
 echo -e "${YELLOW}Attente du démarrage des services...${NC}"
 sleep 30
 
-# 8. Obtenir le certificat SSL
+# 8. Obtention du certificat SSL - modifié pour utiliser le port 8080
 echo -e "${YELLOW}Obtention du certificat SSL...${NC}"
-echo -e "${RED}⚠️ Arrêt temporaire de Nginx pour l'obtention du certificat SSL${NC}"
-docker-compose -f docker-compose.prod.yml stop nginx
+echo -e "${RED}⚠️ Si l'obtention du certificat échoue, vous pouvez utiliser votre application sans HTTPS${NC}"
+echo -e "${RED}   Accédez à votre application via http://${DOMAIN}:8080${NC}"
 
-echo -e "${YELLOW}Exécution de Certbot...${NC}"
-docker run --rm -it \
-  -v "$(pwd)/nginx/certbot/conf:/etc/letsencrypt" \
-  -v "$(pwd)/nginx/certbot/www:/var/www/certbot" \
-  certbot/certbot certonly --webroot \
-  --webroot-path=/var/www/certbot \
-  --email ${EMAIL} \
-  --agree-tos --no-eff-email \
-  -d ${DOMAIN}
-
-# 9. Utiliser la configuration SSL
-echo -e "${YELLOW}Activation de la configuration SSL...${NC}"
-cp nginx/conf/app-ssl.conf nginx/conf/app.conf
-
-# 10. Redémarrer les services
-echo -e "${YELLOW}Redémarrage des services...${NC}"
-docker-compose -f docker-compose.prod.yml up -d
-
-# 11. Initialisation des données
+# 9. Initialisation des données
 echo -e "${YELLOW}Vérification de l'initialisation des données...${NC}"
 echo -e "${YELLOW}Lancement du job RSS-Fetch...${NC}"
-docker-compose -f docker-compose.prod.yml exec app node src/services/manual-runner.js --job=rss-fetch
+docker-compose -f docker-compose.prod.yml exec app node run-jobs.js --job=rss-fetch
 
-# 12. Configuration des sauvegardes
+# 10. Configuration des sauvegardes
 echo -e "${YELLOW}Configuration des sauvegardes automatiques...${NC}"
 cat > ~/backup-veille.sh << 'EOL'
 #!/bin/bash
@@ -203,7 +186,7 @@ chmod +x ~/backup-veille.sh
 # Ajouter le job de sauvegarde au crontab
 (crontab -l 2>/dev/null; echo "0 2 * * * /home/$(whoami)/backup-veille.sh") | crontab -
 
-# 13. Script de surveillance
+# 11. Script de surveillance
 echo -e "${YELLOW}Configuration de la surveillance automatique...${NC}"
 cat > ~/check-veille.sh << 'EOL'
 #!/bin/bash
@@ -244,6 +227,6 @@ chmod +x ~/check-veille.sh
 (crontab -l 2>/dev/null; echo "0 * * * * /home/$(whoami)/check-veille.sh") | crontab -
 
 echo -e "${GREEN}Déploiement terminé!${NC}"
-echo -e "${GREEN}Votre application est maintenant disponible à l'adresse https://${DOMAIN}${NC}"
+echo -e "${GREEN}Votre application est maintenant disponible à l'adresse http://${DOMAIN}:8080${NC}"
 echo -e "${YELLOW}N'oubliez pas de vérifier les logs pour vous assurer que tout fonctionne correctement:${NC}"
 echo -e "${YELLOW}docker-compose -f docker-compose.prod.yml logs -f${NC}"
