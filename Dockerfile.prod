@@ -24,11 +24,8 @@ RUN npm ci --only=production
 
 # Copy built application from builder stage
 COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/.next/standalone ./standalone
-COPY --from=builder /app/next.config.ts ./
 COPY --from=builder /app/public ./public
-COPY --from=builder /app/telegram-sender.js ./
-COPY --from=builder /app/telegram-cron.js ./
+COPY --from=builder /app/next.config.ts ./
 
 # Create podcasts directory if it doesn't exist
 RUN mkdir -p ./public/podcasts
@@ -36,5 +33,5 @@ RUN mkdir -p ./public/podcasts
 # Expose port
 EXPOSE 3000
 
-# Start command - Use the standalone server as indicated by the warning
+# Start command - Use the correct command for standalone mode
 CMD ["node", ".next/standalone/server.js"]

@@ -5,13 +5,16 @@ WORKDIR /app
 
 # Copy package files and install dependencies
 COPY package*.json ./
-RUN npm ci
+RUN npm ci --only=production
 
-# Copy source code
-COPY . .
+# Install additional dependencies needed for cron jobs
+RUN npm install node-cron axios pg rss-parser dotenv
 
 # Create podcasts directory
 RUN mkdir -p ./public/podcasts
 
-# Start the cron job wrapper script
-CMD ["node", "src/services/cron-wrapper.js"]
+# Copy only the JavaScript cron runner
+COPY cron-runner.js ./
+
+# Start the cron job runner
+CMD ["node", "cron-runner.js"]
