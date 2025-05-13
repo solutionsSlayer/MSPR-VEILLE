@@ -59,12 +59,29 @@ export async function POST(
     logger.info(`Generating summary for article ID: ${articleId}`);
 
     // Generate summary using Genkit AI
-    const prompt = `Please summarize the following article in 3-5 concise paragraphs. Focus on the key points and main takeaways.
+    // Check if content is too short (likely just a preview)
+    const isPreviewOnly = contentToSummarize.length < 1000 ||
+                         contentToSummarize.includes("Continue reading") ||
+                         contentToSummarize.includes("Read more");
+
+    let prompt;
+    if (isPreviewOnly) {
+      prompt = `The following is a preview/excerpt of an article. Based on this limited information,
+provide a brief summary of what the article seems to be about. Be clear that this is based only on the preview,
+and note any key topics or themes that appear to be discussed.
+
+TITLE: ${title}
+
+PREVIEW CONTENT:
+${contentToSummarize}`;
+    } else {
+      prompt = `Please summarize the following article in 3-5 concise paragraphs. Focus on the key points and main takeaways.
 
 TITLE: ${title}
 
 CONTENT:
 ${contentToSummarize}`;
+    }
 
     const response = await ai.generate({ // Use ai.generate for text
         model: 'googleai/gemini-2.0-flash', // Specify a model if not default

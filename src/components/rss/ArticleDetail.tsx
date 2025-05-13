@@ -183,7 +183,15 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ articleId }) => {
     setError(null); // Clear previous errors specific to generation
 
     try {
-      const response = await fetch(`/api/articles/${articleId}/podcast`, { method: 'POST' });
+      const response = await fetch(`/api/articles/${articleId}/podcast`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          // Add CSRF protection if your app uses it
+          // 'X-CSRF-Token': getCsrfToken(),
+        },
+        credentials: 'same-origin' // Include cookies
+      });
       const data = await response.json();
       if (!response.ok) {
         throw new Error(data.error || 'Failed to generate podcast');

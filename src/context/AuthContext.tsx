@@ -12,9 +12,9 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Mock credentials (replace with actual authentication logic)
-const MOCK_USERNAME = 'user';
-const MOCK_PASSWORD = 'password';
+// Application credentials - strengthened
+const MOCK_USERNAME = 'quantumadmin';
+const MOCK_PASSWORD = 'Qu4ntumV3ill3T3ch2025!';
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -48,35 +48,45 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     await new Promise(resolve => setTimeout(resolve, 500));
 
     if (username === MOCK_USERNAME && password === MOCK_PASSWORD) {
-      setIsAuthenticated(true);
       try {
         localStorage.setItem('isAuthenticated', 'true');
       } catch (error) {
-           console.error("Could not set auth status in localStorage:", error);
+        console.error("Could not set auth status in localStorage:", error);
       }
-      router.push('/'); // Redirect to home on successful login
+
+      // Set authenticated state and stop loading
+      setIsAuthenticated(true);
+      setIsLoading(false);
+
+      // Redirect to home page
+      router.push('/');
     } else {
-      setIsAuthenticated(false);
       try {
-           localStorage.removeItem('isAuthenticated');
+        localStorage.removeItem('isAuthenticated');
       } catch (error) {
-            console.error("Could not remove auth status from localStorage:", error);
+        console.error("Could not remove auth status from localStorage:", error);
       }
+
+      setIsAuthenticated(false);
+      setIsLoading(false);
       throw new Error('Invalid username or password');
     }
-    setIsLoading(false);
   };
 
   const logout = () => {
     setIsLoading(true);
     setIsAuthenticated(false);
-     try {
-        localStorage.removeItem('isAuthenticated');
-     } catch (error) {
-         console.error("Could not remove auth status from localStorage during logout:", error);
-     }
-    router.push('/login'); // Redirect to login page
+    try {
+      localStorage.removeItem('isAuthenticated');
+    } catch (error) {
+      console.error("Could not remove auth status from localStorage during logout:", error);
+    }
+
+    // Stop loading
     setIsLoading(false);
+
+    // Redirect to login page
+    router.push('/login');
   };
 
   return (

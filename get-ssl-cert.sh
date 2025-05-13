@@ -5,8 +5,8 @@ set -e
 echo "Stopping Nginx container..."
 docker-compose -f docker-compose.prod.yml stop nginx
 
-# Replace with your email
-EMAIL="your@email.com"
+# Email and domain configuration
+EMAIL="admin@pandemicplatform.org"
 DOMAIN="veille.pandemicplatform.org"
 
 # Ensure certbot directories exist
@@ -27,7 +27,7 @@ curl -s -o /dev/null -w "%{http_code}" http://$DOMAIN/ || {
 
 # Get SSL certificate
 echo "Attempting to obtain SSL certificate for $DOMAIN..."
-docker run --rm -it \
+docker run --rm \
   -v "$(pwd)/nginx/certbot/conf:/etc/letsencrypt" \
   -v "$(pwd)/nginx/certbot/www:/var/www/certbot" \
   certbot/certbot \
@@ -35,6 +35,7 @@ docker run --rm -it \
   --webroot-path=/var/www/certbot \
   --email $EMAIL \
   --agree-tos --no-eff-email \
+  --non-interactive \
   -d $DOMAIN || {
     echo ""
     echo "Certificate acquisition failed. Temporarily configuring Nginx for HTTP-only mode..."

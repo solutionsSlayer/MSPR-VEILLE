@@ -9,15 +9,14 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
 
-// ElevenLabs API configuration
+// Simplified ElevenLabs configuration
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
-const ELEVENLABS_API_URL = 'https://api.elevenlabs.io/v1/text-to-speech';
 const PODCASTS_DIR = path.join(process.cwd(), 'public', 'podcasts');
 
-// Voice IDs (ensure these are set in .env or have defaults)
-const VOICE_IDS: Record<string, string> = {
-  en: process.env.ELEVENLABS_EN_VOICE_ID || 'pNInz6obpgDQGcFmaJgB', // Default English voice
-  fr: process.env.ELEVENLABS_FR_VOICE_ID || 'EXAVITQu4vr4xnSDxMaL', // Default French voice
+// Voice IDs from environment
+const VOICE_IDS = {
+  en: process.env.ELEVENLABS_EN_VOICE_ID || 'a5n9pJUnAhX4fn7lx3uo',
+  fr: process.env.ELEVENLABS_FR_VOICE_ID || 'aQROLel5sQbj1vuIVi6B',
 };
 
 // Function to sanitize filenames
@@ -34,6 +33,14 @@ export async function POST(
   request: Request,
   { params }: { params: { id: string } }
 ) {
+  // Check for cookie-based authentication or other security measures
+  // This is just a placeholder - implement according to your auth system
+  /*
+  const session = await getSession(request);
+  if (!session) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  */
   const articleId = parseInt(params.id, 10);
 
   if (isNaN(articleId)) {
@@ -41,7 +48,6 @@ export async function POST(
   }
 
   if (!ELEVENLABS_API_KEY) {
-    logger.error('ElevenLabs API key is not set.');
     return NextResponse.json({ error: 'Podcast generation service is not configured.' }, { status: 503 });
   }
 
@@ -55,7 +61,7 @@ export async function POST(
       return NextResponse.json(existingPodcast.rows[0]); // Return existing podcast
     }
 
-    // Fetch the latest summary for the article
+    // Fetch the summary for the article
     const summaryRes = await pool.query(
       `SELECT s.*, i.title as item_title, f.title as feed_title
        FROM rss.summaries s
@@ -68,82 +74,68 @@ export async function POST(
     );
 
     if (summaryRes.rows.length === 0) {
-      return NextResponse.json({ error: 'No summary found for this article to generate a podcast.' }, { status: 404 });
+      return NextResponse.json({ error: 'No summary found for this article.' }, { status: 404 });
     }
+    
     const summary = summaryRes.rows[0];
-
-    logger.info(`Generating podcast for article ID: ${articleId}, summary ID: ${summary.id}`);
-
-    // --- ElevenLabs Generation ---
+    const voiceId = VOICE_IDS[summary.language] || VOICE_IDs.en;
+    
+    // Create directories
     await fs.promises.mkdir(PODCASTS_DIR, { recursive: true });
     const feedDir = path.join(PODCASTS_DIR, sanitizeFilename(summary.feed_title));
     await fs.promises.mkdir(feedDir, { recursive: true });
 
+    // Generate filename
     const fileName = `${sanitizeFilename(summary.item_title || `podcast-${summary.id}`)}.mp3`;
-    const absoluteFilePath = path.join(feedDir, fileName);
-     // Store relative path from 'public' directory for URL access
-    const publicRelativePath = path.join('podcasts', sanitizeFilename(summary.feed_title), fileName);
-
-
-    const textToSpeak = `${summary.item_title}. ${summary.summary_text}`;
-    const voiceId = VOICE_IDS[summary.language] || VOICE_IDS.en; // Fallback to English voice
-
-    const response = await axios({
-      method: 'POST',
-      url: `${ELEVENLABS_API_URL}/${voiceId}`,
-      headers: {
-        'Accept': 'audio/mpeg',
-        'Content-Type': 'application/json',
-        'xi-api-key': ELEVENLABS_API_KEY,
-      },
-      data: {
-        text: textToSpeak,
-        model_id: 'eleven_multilingual_v2', // Or your preferred model
-        voice_settings: { stability: 0.5, similarity_boost: 0.75 },
-      },
-      responseType: 'stream',
-    });
-
-    // Save the audio file
-    const writer = fs.createWriteStream(absoluteFilePath);
-    response.data.pipe(writer);
-
-    await new Promise<void>((resolve, reject) => {
-      writer.on('finish', async () => {
-        try {
-          // Estimate duration (replace with actual duration calculation if possible)
-          const estimatedDuration = Math.ceil(textToSpeak.length / 15); // Adjust divisor as needed
-
-          // Save podcast metadata to database
-          const result = await pool.query(
-            `INSERT INTO rss.podcasts (item_id, summary_id, audio_file_path, duration, voice_id)
-             VALUES ($1, $2, $3, $4, $5)
-             RETURNING *`,
-            [articleId, summary.id, `/${publicRelativePath}`, estimatedDuration, voiceId] // Store URL path
-          );
-
-          logger.info(`Successfully generated and saved podcast for article ID: ${articleId}`);
-          resolve(result.rows[0]); // Resolve with the created podcast record
-        } catch (dbError) {
-          reject(dbError);
-        }
+    const filePath = path.join(feedDir, fileName);
+    
+    // Prepare text
+    const textToSpeak = `${summary.item_title}. ${summary.summary_text}`.substring(0, 3000);
+    
+    // Generate audio with ElevenLabs - use arraybuffer
+    try {
+      const response = await axios({
+        method: 'POST',
+        url: `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
+        headers: {
+          'Accept': 'audio/mpeg',
+          'Content-Type': 'application/json',
+          'xi-api-key': ELEVENLABS_API_KEY,
+        },
+        data: {
+          text: textToSpeak,
+          model_id: 'eleven_multilingual_v2',
+          voice_settings: { stability: 0.5, similarity_boost: 0.75 },
+        },
+        responseType: 'arraybuffer',
+        timeout: 30000,
       });
-      writer.on('error', (streamError) => {
-           logger.error(`Error writing audio file for article ${articleId}:`, streamError);
-           // Attempt to clean up partially written file
-           fs.unlink(absoluteFilePath, (unlinkErr) => {
-               if (unlinkErr) logger.error(`Failed to delete partial file ${absoluteFilePath}:`, unlinkErr);
-           });
-           reject(streamError);
-       });
-    }).then(podcastRecord => {
-         return NextResponse.json(podcastRecord, { status: 201 });
-    });
-    // The promise above now returns the NextResponse directly on success.
 
-  } catch (error: any) {
-    logger.error(`Error generating podcast for article ${articleId}:`, error.response?.data || error.message || error);
-    const errorMessage = error.response?.data?.detail?.message || error.message || 'Failed to generate podcast';
-    return NextResponse.json({ error: errorMessage }, { status: 500 });
+      // Write the file
+      await fs.promises.writeFile(filePath, response.data);
+      
+      // Save to database - important: path needs to match Nginx config
+      const publicPath = `/podcasts/${sanitizeFilename(summary.feed_title)}/${fileName}`;
+      const duration = Math.ceil(textToSpeak.length / 15);
+      
+      const result = await pool.query(
+        `INSERT INTO rss.podcasts (item_id, summary_id, audio_file_path, duration, voice_id)
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING *`,
+        [articleId, summary.id, publicPath, duration, voiceId]
+      );
+
+      return NextResponse.json(result.rows[0], { status: 201 });
+    } catch (audioError) {
+      logger.error('ElevenLabs API error:', audioError.message);
+      if (audioError.response) {
+        logger.error(`Status: ${audioError.response.status}`);
+      }
+      throw new Error(`Failed to generate audio: ${audioError.message}`);
+    }
+
+  } catch (error) {
+    logger.error(`Podcast generation error:`, error.message);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

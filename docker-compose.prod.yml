@@ -33,8 +33,8 @@ services:
       - NODE_ENV=production
       - GOOGLE_GENAI_API_KEY=${GOOGLE_GENAI_API_KEY}
       - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY}
-      - ELEVENLABS_EN_VOICE_ID=${ELEVENLABS_EN_VOICE_ID}
-      - ELEVENLABS_FR_VOICE_ID=${ELEVENLABS_FR_VOICE_ID}
+      - ELEVENLABS_EN_VOICE_ID=a5n9pJUnAhX4fn7lx3uo
+      - ELEVENLABS_FR_VOICE_ID=aQROLel5sQbj1vuIVi6B
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
       - TELEGRAM_BATCH_SIZE=${TELEGRAM_BATCH_SIZE:-5}
@@ -61,10 +61,11 @@ services:
     restart: unless-stopped
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-veille_user}:${POSTGRES_PASSWORD:-veille_password}@postgres:5432/${POSTGRES_DB:-veille_db}
+      - NODE_ENV=production
       - GOOGLE_GENAI_API_KEY=${GOOGLE_GENAI_API_KEY}
       - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY}
-      - ELEVENLABS_EN_VOICE_ID=${ELEVENLABS_EN_VOICE_ID}
-      - ELEVENLABS_FR_VOICE_ID=${ELEVENLABS_FR_VOICE_ID}
+      - ELEVENLABS_EN_VOICE_ID=a5n9pJUnAhX4fn7lx3uo
+      - ELEVENLABS_FR_VOICE_ID=aQROLel5sQbj1vuIVi6B
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
       - TELEGRAM_BATCH_SIZE=${TELEGRAM_BATCH_SIZE:-5}
@@ -90,8 +91,8 @@ services:
     container_name: veille-nginx
     restart: unless-stopped
     ports:
-      - "8080:80"
-      - "8443:443"
+      - "80:80"
+      - "443:443"
     volumes:
       - ./nginx/conf:/etc/nginx/conf.d
       - ./nginx/ssl:/etc/nginx/ssl
