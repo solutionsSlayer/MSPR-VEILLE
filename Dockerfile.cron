@@ -19,5 +19,8 @@ RUN mkdir -p ./public/podcasts
 # Copy cron service script instead of using echo
 COPY ./cron-service.js /app/cron-service.js
 
+# Copy cron runner script
+COPY ./cron-runner.js /app/cron-runner.js
+
 # Start the cron service
-CMD ["node", "cron-service.js"]
+CMD ["node", "cron-runner.js"]
